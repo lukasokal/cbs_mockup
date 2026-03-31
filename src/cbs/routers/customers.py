@@ -1,6 +1,6 @@
 """Customer / KYC endpoints."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from cbs.database import get_db
@@ -37,8 +37,6 @@ def list_customers(db: Session = Depends(get_db)):
 
 @router.get("/{customer_id}", response_model=CustomerResponse)
 def get_customer(customer_id: int, db: Session = Depends(get_db)):
-    from fastapi import HTTPException
-
     customer = db.get(Customer, customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -47,8 +45,6 @@ def get_customer(customer_id: int, db: Session = Depends(get_db)):
 
 @router.patch("/{customer_id}", response_model=CustomerResponse)
 def update_customer(customer_id: int, data: CustomerUpdate, db: Session = Depends(get_db)):
-    from fastapi import HTTPException
-
     customer = db.get(Customer, customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")

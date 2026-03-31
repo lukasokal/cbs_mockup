@@ -22,7 +22,7 @@ card issuing, acquiring, lending, and general ledger.
 ```bash
 # Create a virtual environment and install
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]" python-dateutil
+pip install -e ".[dev]"
 
 # Run the API server
 uvicorn cbs.main:app --reload
