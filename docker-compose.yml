@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # Kafka for event streaming middleware
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+
+  # API Gateway
+  api-gateway:
+    image: openjdk:17-jdk-slim
+    build:
+      context: ./cbs-api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      - kafka
+    networks:
+      - cbs-network
+
+  # Account Service
+  account-service:
+    image: openjdk:17-jdk-slim
+    build:
+      context: ./cbs-account-service
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_DATASOURCE_URL: jdbc:h2:mem:accountdb
+    depends_on:
+      - kafka
+    networks:
+      - cbs-network
+
+  # Payment Service
+  payment-service:
+    image: openjdk:17-jdk-slim
+    build:
+      context: ./cbs-payment-service
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_DATASOURCE_URL: jdbc:h2:mem:paymentdb
+    depends_on:
+      - kafka
+    networks:
+      - cbs-network
+
+  # Frontend
+  frontend:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./cbs-frontend:/app
+    ports:
+      - "3000:3000"
+    command: npm start
+    environment:
+      REACT_APP_API_URL: http://localhost:8080
+    networks:
+      - cbs-network
+
+networks:
+  cbs-network:
+    driver: bridge

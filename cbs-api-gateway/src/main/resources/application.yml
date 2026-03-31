@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 30000
+        response-timeout: 60000
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: false
+            maxAge: 3600
+    discovery:
+      client:
+        simple:
+          instances:
+            account-service:
+              - instanceId: account-service-1
+                uri: http://localhost:8081
+            payment-service:
+              - instanceId: payment-service-1
+                uri: http://localhost:8082
+            customer-service:
+              - instanceId: customer-service-1
+                uri: http://localhost:8083
+            auth-service:
+              - instanceId: auth-service-1
+                uri: http://localhost:8084
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env
+  endpoint:
+    health:
+      show-details: always
+
+jwt:
+  secret: cbs-secret-key-banking-system-2026
+  expiration: 86400000
+
+logging:
+  level:
+    root: INFO
+    com.cbs: DEBUG
+    org.springframework.cloud.gateway: DEBUG
