@@ -1,0 +1,42 @@
+name: Refresh Monthly Cost Workbook
+
+on:
+  schedule:
+    - cron: "0 4 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-monthly-cost:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependency
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install openpyxl
+
+      - name: Regenerate workbook
+        run: python scripts/generate_monthly_cost_xlsx.py
+
+      - name: Commit and push if changed
+        run: |
+          if git diff --quiet -- "monthly cost.xlsx"; then
+            echo "No workbook changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "monthly cost.xlsx"
+          git commit -m "Refresh monthly cost workbook"
+          git push
