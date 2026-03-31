@@ -8,11 +8,11 @@ spring:
     password:
   h2:
     console:
-      enabled: true
+      enabled: false
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: update
     show-sql: false
   kafka:
     bootstrap-servers: localhost:9092
@@ -25,7 +25,7 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "*"
+        spring.json.trusted.packages: "com.cbs"
   topics:
     payment-events: payment-events
 
@@ -38,13 +38,12 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,env,prometheus
+        include: health,info,metrics,prometheus
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
 
 logging:
   level:
     root: INFO
     com.cbs: DEBUG
-    org.springframework.web: DEBUG

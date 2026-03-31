@@ -50,7 +50,6 @@ function AccountManagement() {
     e.preventDefault();
     try {
       // TODO: Call API Gateway POST /api/accounts
-      console.log('Creating account:', formData);
       setShowCreateForm(false);
       setFormData({
         customerId: '',

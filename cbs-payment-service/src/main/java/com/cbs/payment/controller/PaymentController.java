@@ -13,7 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/payments")
 @Slf4j
-@CrossOrigin(origins = "*", maxAge = 3600)
+@CrossOrigin(origins = "${CORS_ALLOWED_ORIGINS:http://localhost:3000}", maxAge = 3600)
 public class PaymentController {
 
     private final PaymentService paymentService;

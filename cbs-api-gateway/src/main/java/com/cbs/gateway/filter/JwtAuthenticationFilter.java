@@ -15,7 +15,7 @@ import reactor.core.publisher.Mono;
 @Component
 public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAuthenticationFilter.Config> {
 
-    @Value("${jwt.secret:cbs-secret-key-banking-system-2026}")
+    @Value("${jwt.secret}")
     private String secretKey;
 
     public JwtAuthenticationFilter() {

@@ -16,3 +16,18 @@ venv/
 .mypy_cache/
 htmlcov/
 .coverage
+
+# Node
+node_modules/
+**/node_modules/
+npm-debug.log*
+
+# Java build output
+target/
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.vscode/settings.json

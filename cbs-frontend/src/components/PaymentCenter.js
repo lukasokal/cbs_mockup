@@ -52,9 +52,12 @@ function PaymentCenter() {
 
   const handleInitiatePayment = async (e) => {
     e.preventDefault();
+    if (formData.amount <= 0) {
+      alert('Amount must be greater than zero.');
+      return;
+    }
     try {
       // TODO: Call API Gateway POST /api/payments
-      console.log('Initiating payment:', formData);
       setShowPaymentForm(false);
       setFormData({
         initiatorAccountId: '',
@@ -74,7 +77,6 @@ function PaymentCenter() {
   const handleApprovePayment = async (paymentId) => {
     try {
       // TODO: Call API Gateway POST /api/payments/{paymentId}/approve
-      console.log('Approving payment:', paymentId);
       // fetchPayments();
     } catch (error) {
       console.error('Error approving payment:', error);
