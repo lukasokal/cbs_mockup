@@ -40,6 +40,54 @@ Minimum production-oriented layout:
 - 1 Standard Load Balancer
 - 3 application VMs in backend pool
 
+### 2.1 Estimated Monthly Cost (Azure Pricing Calculator)
+
+Price list date: **2026-03-31**
+
+Calculation basis:
+
+- Region: `West Europe`
+- Billing model: Pay-as-you-go (Linux)
+- Runtime: `730 hours/month`
+- Currency: `USD`
+- Data transfer, backup, and observability ingestion are **not included** in the base estimate
+
+Reference unit prices used in the estimate:
+
+| Resource | Unit price assumption |
+|---|---:|
+| VM `Standard_D4s_v5` | $0.19/hour |
+| VM `Standard_D8s_v5` | $0.38/hour |
+| Premium SSD `P20` | $19/month per disk |
+| Standard Public IP | $3/month |
+| Standard Load Balancer | $20/month |
+| Application Gateway `WAF_v2` (small setup) | $330/month |
+
+Monthly cost formulas:
+
+- `D4 VM monthly = 0.19 x 730 = $138.70`
+- `D8 VM monthly = 0.38 x 730 = $277.40`
+
+Estimated monthly totals for the VM + Load Balancer architecture:
+
+| Environment | Compute | Disks | Network/LB | Estimated total per month |
+|---|---:|---:|---:|---:|
+| Dev / Demo (1x D4 + 1x P20 + PIP) | $138.70 | $19.00 | $3.00 | **$160.70** |
+| Staging (2x D4 + 2x P20 + PIP + LB) | $277.40 | $38.00 | $23.00 | **$338.40** |
+| Production small (3x D8 + 3x P20 + PIP + LB) | $832.20 | $57.00 | $23.00 | **$912.20** |
+
+Estimated monthly totals for VMSS + Application Gateway (TLS 443):
+
+| Environment | Compute | Disks | App Gateway + PIP | Estimated total per month |
+|---|---:|---:|---:|---:|
+| Staging (2x D4 VMSS) | $277.40 | $38.00 | $333.00 | **$648.40** |
+| Production small (3x D8 VMSS) | $832.20 | $57.00 | $333.00 | **$1,222.20** |
+| Production medium (6x D8 VMSS) | $1,664.40 | $114.00 | $333.00 | **$2,111.40** |
+
+Cost accuracy note:
+
+- Recalculate in Azure Pricing Calculator before purchase, especially for reserved instances, savings plans, and expected outbound traffic.
+
 ## 3. Prerequisites
 
 - Azure subscription
