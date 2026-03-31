@@ -1,688 +1,109 @@
-# CBS - Core Banking System
-
-A comprehensive, microservices-based Core Banking System built with Java Spring Boot, featuring:
-- **API Gateway** for request routing and authentication
-- **Microservices** for Account Management and Payment Processing
-- **Event-Driven Middleware** with Apache Kafka for scalable event streaming
-- **React Frontend** for modern banking operations UI
-- **Docker & Docker Compose** for containerized deployment
-
-## Project Structure
-
-```
-cbs_mockup/
-├── pom.xml                      # Root Maven POM (parent project)
-├── cbs-core/                    # Shared models and DTOs
-│   ├── pom.xml
-│   └── src/main/java/com/cbs/core/
-│       ├── model/               # Account, Payment, Transaction, Customer
-│       └── dto/                 # ApiResponse wrappers
-├── cbs-api-gateway/             # Spring Cloud Gateway (Port 8080)
-│   ├── pom.xml
-│   ├── Dockerfile
-│   └── src/main/java/com/cbs/gateway/
-│       ├── ApiGatewayApplication.java
-│       ├── filter/              # JwtAuthenticationFilter
-│       └── config/              # GatewayConfig with routing rules
-├── cbs-account-service/         # Account Management Service (Port 8081)
-│   ├── pom.xml
-│   ├── Dockerfile
-│   ├── src/main/java/com/cbs/account/
-│   │   ├── AccountServiceApplication.java
-│   │   ├── entity/              # AccountEntity (JPA)
-│   │   ├── repository/          # AccountRepository (Spring Data JPA)
-│   │   ├── service/             # AccountService (Business Logic)
-│   │   └── controller/          # AccountController (REST endpoints)
-│   └── resources/
-│       └── application.yml
-├── cbs-payment-service/         # Payment Processing Service (Port 8082)
-│   ├── pom.xml
-│   ├── Dockerfile
-│   ├── src/main/java/com/cbs/payment/
-│   │   ├── PaymentServiceApplication.java
-│   │   ├── entity/              # PaymentEntity (JPA)
-│   │   ├── repository/          # PaymentRepository
-│   │   ├── service/             # PaymentService with Kafka events
-│   │   └── controller/          # PaymentController (REST endpoints)
-│   └── resources/
-│       └── application.yml
-├── cbs-middleware/              # Event streaming & fraud detection
-│   ├── pom.xml
-│   └── src/main/java/com/cbs/middleware/
-│       ├── config/              # KafkaConfig (topics, producers, consumers)
-│       ├── listener/            # PaymentEventListener
-│       └── service/             # FraudDetectionService
-├── cbs-frontend/                # React.js Frontend Application (Port 3000)
-│   ├── package.json
-│   ├── public/
-│   │   └── index.html
-│   └── src/
-│       ├── App.js               # Main App component
-│       ├── App.css
-│       ├── index.js
-│       └── components/
-│           ├── Navigation.js    # Sidebar navigation
-│           ├── Dashboard.js     # Overview & balance display
-│           ├── AccountManagement.js  # Account operations
-│           └── PaymentCenter.js # Payment initiation & tracking
-├── docker-compose.yml           # Docker Compose orchestration
-└── .gitignore
-```
-
-## CBS Reference Architecture (Whole System)
-
-This section defines the full CBS target architecture (current implementation + planned banking domains).
-
-### 1) Layered Architecture
-
-```mermaid
-flowchart TB
-    A[Digital Channels\nWeb / Mobile / Branch / Partner APIs] --> B[API Gateway & Security Layer\nAuthN/AuthZ, JWT, routing, CORS, throttling]
-    B --> C[Domain Services Layer\nAccounts, Payments, Cards, Lending, Trade, CRM, KYC/KYB]
-    C --> D[Event & Integration Layer\nKafka, orchestration, anti-corruption adapters]
-    C --> E[Data Layer\nService-owned DBs, ledger store, read models]
-    D --> F[External Ecosystem\nSWIFT, SEPA, Card Schemes, AML, Credit Bureaus, ERP]
-    E --> G[Analytics & Reporting\nMIS, BI, regulatory reporting]
-```
-
-### 2) Logical Component View
-
-```mermaid
-flowchart LR
-    FE[React Frontend\nPort 3000] --> GW[API Gateway\nPort 8080]
-
-    subgraph DOMAIN[Domain Microservices]
-        ACC[Account Service\nPort 8081]
-        PAY[Payment Service\nPort 8082]
-        KYC[KYC/KYB Service\nPlanned]
-        CARD[Card Issuing Service\nPlanned]
-        LEND[Lending Service\nPlanned]
-        TRADE[Trade Finance Service\nPlanned]
-        CRM[CRM Service\nPlanned]
-        GL[General Ledger Service\nPlanned]
-    end
-
-    GW --> ACC
-    GW --> PAY
-    GW --> KYC
-    GW --> CARD
-    GW --> LEND
-    GW --> TRADE
-    GW --> CRM
-    GW --> GL
-
-    subgraph INTEGRATION[Middleware & Event Streaming]
-        KAFKA[Kafka Topics\npayment-events, account-events, transaction-events, fraud-events, compliance-events]
-        FRAUD[Fraud Detection\n(cbs-middleware)]
-    end
-
-    ACC <--> KAFKA
-    PAY <--> KAFKA
-    KYC <--> KAFKA
-    CARD <--> KAFKA
-    LEND <--> KAFKA
-    TRADE <--> KAFKA
-    CRM <--> KAFKA
-    GL <--> KAFKA
-    KAFKA --> FRAUD
-
-    EXT[External Providers\nSEPA/SWIFT/Card Networks/AML/KYC] <--> INTEGRATION
-```
-
-### 3) Domain Boundaries (Target CBS Scope)
-
-1. **Customer & Onboarding Domain**
-   - KYC/KYB, customer profile, lifecycle, segmentation
-   - Owns customer master data and onboarding decisions
-
-2. **Accounts & Deposits Domain**
-   - Account opening/closure, balance management, overdraft, statements
-   - Owns account state and posting rules for deposit products
-
-3. **Payments Domain**
-   - Initiation, validation, sanctions checks, execution, status tracking
-   - Owns payment workflows for SEPA/SWIFT/instant rails
-
-4. **Cards Domain**
-   - Card lifecycle (issue, activate, block), limits, authorization integrations
-   - Owns card product settings and card-account mapping
-
-5. **Lending Domain**
-   - Loan origination, scoring, disbursement, schedules, collections
-   - Owns loan contracts and repayment state
-
-6. **Trade Finance Domain**
-   - Letters of credit, guarantees, documentary collections
-   - Owns trade instrument lifecycle and compliance checkpoints
-
-7. **Ledger & Finance Domain**
-   - Double-entry accounting, chart of accounts, period close, reconciliation
-   - Owns legal financial books and accounting integrity
-
-8. **Risk, Fraud & Compliance Domain**
-   - Fraud scoring, AML monitoring, sanctions, case management
-   - Consumes events from all domains for real-time controls
-
-9. **CRM & Engagement Domain**
-   - Sales pipeline, service tickets, campaigns, customer interactions
-   - Provides 360-degree customer context to channels and operations
-
-10. **Integration & Orchestration Domain**
-   - External adapters, canonical event model, process orchestration
-   - Shields core domains from external protocol and format volatility
-
-### 4) Interaction Pattern
-
-1. **Synchronous path (command/query)**
-   - Channel -> API Gateway -> Domain service REST API
-   - Used for user-facing reads/writes requiring immediate response
-
-2. **Asynchronous path (events)**
-   - Domain service emits event -> Kafka topic -> subscribers process independently
-   - Used for decoupled downstream processing (fraud, compliance, CRM, reporting)
-
-3. **Consistency strategy**
-   - Strong consistency inside each service boundary
-   - Eventual consistency across services via idempotent consumers and retries
-
-### 5) Deployment Topology (Current Repo)
-
-1. **Frontend**: React application (`cbs-frontend`) on port `3000`
-2. **Gateway**: Spring Cloud Gateway (`cbs-api-gateway`) on port `8080`
-3. **Domain services**:
-   - Account Service (`cbs-account-service`) on port `8081`
-   - Payment Service (`cbs-payment-service`) on port `8082`
-4. **Middleware**: Kafka + Zookeeper + `cbs-middleware`
-5. **Shared contracts**: `cbs-core` for common DTO/model artifacts
-
-### 6) Architecture Principles
-
-1. **Domain-driven decomposition** with service-owned data
-2. **API-first contracts** for channel and partner integrations
-3. **Event-driven extensibility** for risk/compliance/reporting workloads
-4. **Security by design**: centralized gateway policies and token validation
-5. **Operability**: containerized services, health checks, observable event flows
-
-### 7) Dedicated Infrastructure View
-
-```mermaid
-flowchart TB
-   U[Users / Operators] --> DNS[DNS + TLS Endpoint]
-   DNS --> EDGE[Edge / Reverse Proxy]
-
-   subgraph DMZ[DMZ Network]
-      EDGE
-   end
-
-   subgraph APP[Application Network]
-      FE[Frontend Container\nReact - 3000]
-      GW[API Gateway Container\nSpring Cloud Gateway - 8080]
-      ACC[Account Service Container\n8081]
-      PAY[Payment Service Container\n8082]
-      MID[Middleware Container\nFraud + Event Consumers]
-   end
-
-   subgraph MSG[Messaging Network]
-      ZK[Zookeeper]
-      KAFKA[Kafka Broker\n9092 / 29092]
-   end
-
-   subgraph DATA[Data Network]
-      ACCDB[(Account DB)]
-      PAYDB[(Payment DB)]
-      LEDGERDB[(Ledger DB - Planned)]
-   end
-
-   subgraph OBS[Observability & Ops]
-      LOG[Centralized Logs]
-      METRICS[Metrics / Dashboards]
-      ALERT[Alerting]
-   end
-
-   EDGE --> FE
-   FE --> GW
-   GW --> ACC
-   GW --> PAY
-
-   ACC --> ACCDB
-   PAY --> PAYDB
-
-   PAY <--> KAFKA
-   ACC <--> KAFKA
-   MID <--> KAFKA
-   ZK --- KAFKA
-
-   ACC -. telemetry .-> LOG
-   PAY -. telemetry .-> LOG
-   GW -. telemetry .-> LOG
-   MID -. telemetry .-> LOG
-   KAFKA -. telemetry .-> METRICS
-   LOG --> ALERT
-   METRICS --> ALERT
-```
-
-**Runtime placement in this repository:**
-1. `docker-compose.yml` orchestrates frontend, gateway, domain services, Kafka, and Zookeeper.
-2. Each backend service runs as an independently deployable container with its own runtime config.
-3. Datastores are service-owned (separate schemas/instances per domain recommended for production).
-
-**Infrastructure concerns by layer:**
-1. **Edge**: TLS termination, WAF/rate-limit, request size limits.
-2. **Application**: horizontal scaling for stateless gateway/services.
-3. **Messaging**: topic partitioning, retention, dead-letter strategy, idempotent producers.
-4. **Data**: backups, PITR, encryption at rest, migration/version strategy.
-5. **Operations**: health probes, SLO metrics, alert routing, incident runbooks.
-
-### 8) Kubernetes Infrastructure View
-
-```mermaid
-flowchart TB
-   USER[Web/Mobile Users] --> INGRESS[Ingress Controller + TLS]
-
-   subgraph NS1[cbs-channels namespace]
-      FEDEP[frontend Deployment]
-      FESVC[frontend Service]
-      INGRESS --> FESVC --> FEDEP
-   end
-
-   subgraph NS2[cbs-core namespace]
-      GDEP[api-gateway Deployment]
-      GSVC[api-gateway Service]
-      ADEP[account-service Deployment]
-      ASVC[account-service Service]
-      PDEP[payment-service Deployment]
-      PSVC[payment-service Service]
-      MDEP[middleware Deployment]
-
-      FESVC --> GSVC --> GDEP
-      GDEP --> ASVC --> ADEP
-      GDEP --> PSVC --> PDEP
-   end
-
-   subgraph NS3[cbs-messaging namespace]
-      KSTATE[Kafka StatefulSet]
-      ZSTATE[Zookeeper StatefulSet]
-      KHEAD[Kafka Headless Service]
-      ZSVC[Zookeeper Service]
-      ZSTATE --> ZSVC
-      KSTATE --> KHEAD
-   end
-
-   subgraph NS4[cbs-data namespace]
-      ADB[(Account PostgreSQL)]
-      PDB[(Payment PostgreSQL)]
-      PVC[(PersistentVolumeClaims)]
-      ADB --- PVC
-      PDB --- PVC
-   end
-
-   subgraph NS5[cbs-observability namespace]
-      PROM[Prometheus]
-      GRAF[Grafana]
-      LOKI[Loki/ELK]
-      ALERTM[Alertmanager]
-      PROM --> GRAF
-      PROM --> ALERTM
-   end
-
-   ADEP <--> KHEAD
-   PDEP <--> KHEAD
-   MDEP <--> KHEAD
-   KSTATE --- ZSVC
-
-   ADEP --> ADB
-   PDEP --> PDB
-
-   GDEP -. metrics/logs .-> PROM
-   ADEP -. metrics/logs .-> PROM
-   PDEP -. metrics/logs .-> PROM
-   MDEP -. metrics/logs .-> PROM
-   GDEP -. logs .-> LOKI
-   ADEP -. logs .-> LOKI
-   PDEP -. logs .-> LOKI
-   MDEP -. logs .-> LOKI
-```
-
-**Kubernetes platform controls:**
-1. **Traffic**: Ingress + cert-manager for TLS certificates and host routing.
-2. **Scaling**: HPA for stateless deployments (gateway/services) based on CPU and request latency.
-3. **Resilience**: readiness/liveness probes, PodDisruptionBudget, and rolling updates.
-4. **Stateful workloads**: StatefulSets for Kafka/Zookeeper and PVC-backed databases.
-5. **Security**: namespace isolation, NetworkPolicies, Secrets, and least-privilege ServiceAccounts.
-6. **Release strategy**: Helm or Kustomize with separate values/overlays per environment.
-
-## Database Schema
-
-### Accounts Table
-```sql
-CREATE TABLE accounts (
-    account_id VARCHAR(36) PRIMARY KEY,
-    customer_id VARCHAR(36) NOT NULL,
-    account_type VARCHAR(50),
-    currency VARCHAR(3),
-    balance DECIMAL(19, 2),
-    available_balance DECIMAL(19, 2),
-    status VARCHAR(20),
-    iban VARCHAR(34) UNIQUE,
-    bic VARCHAR(11),
-    created_at TIMESTAMP,
-    last_modified TIMESTAMP,
-    interest_rate DECIMAL(5, 4),
-    product_code VARCHAR(50)
-);
-```
-
-### Payments Table
-```sql
-CREATE TABLE payments (
-    payment_id VARCHAR(36) PRIMARY KEY,
-    initiator_account_id VARCHAR(36),
-    beneficiary_iban VARCHAR(34),
-    beneficiary_name VARCHAR(255),
-    amount DECIMAL(19, 2),
-    currency VARCHAR(3),
-    payment_type VARCHAR(50),
-    payment_status VARCHAR(50),
-    created_at TIMESTAMP,
-    executed_at TIMESTAMP,
-    requested_execution_date DATE,
-    remittance_information VARCHAR(500),
-    purpose_code VARCHAR(10),
-    end_to_end_reference VARCHAR(50),
-    mandate_reference VARCHAR(50),
-    transaction_id VARCHAR(36),
-    error_message VARCHAR(500),
-    beneficiary_bank_code VARCHAR(50),
-    exchange_rate DECIMAL(10, 4),
-    channel VARCHAR(50)
-);
-```
-
-## Installation & Setup
-
-### Prerequisites
-- Java 17+
-- Maven 3.8+
-- Node.js 18+ and npm
-- Docker & Docker Compose
-- Git
-
-### Option 1: Local Development (Without Docker)
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/lukasokal/cbs_mockup.git
-   cd cbs_mockup
-   ```
-
-2. **Build the backend services**
-   ```bash
-   mvn clean install -DskipTests
-   ```
-
-3. **Start Kafka & Zookeeper** (requires Docker)
-   ```bash
-   docker-compose up zookeeper kafka -d
-   ```
-
-4. **Start microservices** (in separate terminals)
-   ```bash
-   # Terminal 1: API Gateway
-   cd cbs-api-gateway
-   mvn spring-boot:run
-   
-   # Terminal 2: Account Service
-   cd cbs-account-service
-   mvn spring-boot:run
-   
-   # Terminal 3: Payment Service
-   cd cbs-payment-service
-   mvn spring-boot:run
-   ```
-
-5. **Start the React frontend** (in a new terminal)
-   ```bash
-   cd cbs-frontend
-   npm install
-   npm start
-   ```
-
-6. **Access the application**
-   - Frontend: http://localhost:3000
-   - API Gateway: http://localhost:8080
-   - Account Service: http://localhost:8081
-   - Payment Service: http://localhost:8082
-
-### Option 2: Docker Compose (Recommended)
-
-1. **Clone and navigate to project**
-   ```bash
-   git clone https://github.com/lukasokal/cbs_mockup.git
-   cd cbs_mockup
-   ```
-
-2. **Build all services**
-   ```bash
-   mvn clean package -DskipTests
-   ```
-
-3. **Start all containers**
-   ```bash
-   docker-compose up --build
-   ```
-
-4. **Access the application**
-   - Frontend: http://localhost:3000
-   - API Gateway: http://localhost:8080
-   - Kafka: localhost:9092
-
-5. **Stop all services**
-   ```bash
-   docker-compose down
-   ```
-
-## API Endpoints
-
-### Account Management Service
-
-**Create Account**
-```http
-POST /api/accounts
-Content-Type: application/json
-
-{
-  "customerId": "CUST001",
-  "accountType": "CURRENT",
-  "currency": "EUR",
-  "balance": 1000.00,
-  "iban": "SK9212345678901234567890"
-}
-```
-
-**Get Account**
-```http
-GET /api/accounts/{accountId}
-```
-
-**Get Customer Accounts**
-```http
-GET /api/accounts/customer/{customerId}
-```
-
-**Update Account**
-```http
-PUT /api/accounts/{accountId}
-Content-Type: application/json
-
-{
-  "status": "ACTIVE",
-  "balance": 2000.00
-}
-```
-
-**Debit Account**
-```http
-POST /api/accounts/{accountId}/debit?amount=100.00
-```
-
-**Credit Account**
-```http
-POST /api/accounts/{accountId}/credit?amount=100.00
-```
-
-### Payment Processing Service
-
-**Initiate Payment**
-```http
-POST /api/payments
-Content-Type: application/json
-
-{
-  "initiatorAccountId": "ACC001",
-  "beneficiaryIban": "DE89370400440532013000",
-  "beneficiaryName": "John Doe",
-  "amount": 500.00,
-  "currency": "EUR",
-  "paymentType": "SEPA_SCT",
-  "remittanceInformation": "Invoice #123"
-}
-```
-
-**Get Payment**
-```http
-GET /api/payments/{paymentId}
-```
-
-**Get Payments by Account**
-```http
-GET /api/payments/account/{accountId}
-```
-
-**Get Payments by Status**
-```http
-GET /api/payments/status/{status}
-```
-
-**Submit Payment**
-```http
-POST /api/payments/{paymentId}/submit
-```
-
-**Approve Payment**
-```http
-POST /api/payments/{paymentId}/approve
-```
-
-**Reject Payment**
-```http
-POST /api/payments/{paymentId}/reject?reason=Insufficient%20funds
-```
-
-## Event-Driven Architecture (Kafka)
-
-### Topic: `payment-events`
-Events:
-- `payment-initiated` - Payment created
-- `payment-submitted` - Payment submitted for processing
-- `payment-accepted` - Payment approved and processed
-- `payment-rejected` - Payment rejected with reason
-
-### Topic: `fraud-events`
-- Real-time fraud alerts with risk scores
-
-### Topic: `compliance-events`
-- AML/CFT compliance checks and alerts
-
-## Technology Stack
-
-**Backend:**
-- Spring Boot 3.2
-- Spring Cloud Gateway
-- Spring Data JPA
-- Spring Kafka
-- H2 Database
-- PostgreSQL (production)
-- Lombok
-- JWT
-
-**Frontend:**
-- React 18
-- Axios
-- React Router
-
-**Middleware & Infrastructure:**
-- Apache Kafka 7.5
-- Zookeeper 7.5
-- Docker
-- Docker Compose
-
-## Configuration Files
-
-### Spring Profiles
-- `default` - Local development with H2
-- `docker` - Docker Compose environment with Kafka
-
-### Environment Variables
-```bash
-SPRING_KAFKA_BOOTSTRAP_SERVERS=localhost:9092 (or kafka:29092 in Docker)
-SPRING_DATASOURCE_URL=jdbc:h2:mem:accountdb
-JWT_SECRET=cbs-secret-key-banking-system-2026
-```
-
-## Deployment
-
-### Production Checklist
-1. [ ] Use PostgreSQL instead of H2
-2. [ ] Enable SSL/TLS for API Gateway
-3. [ ] Implement proper JWT token generation and validation
-4. [ ] Set up external Kafka cluster with replication
-5. [ ] Add database backups and recovery procedures
-6. [ ] Implement comprehensive logging and monitoring
-7. [ ] Add health checks and circuit breakers
-8. [ ] Set up CI/CD pipeline
-9. [ ] Implement rate limiting and throttling
-10. [ ] Add comprehensive error handling
-
-## Next Steps & Enhancements
-
-1. **Additional Microservices**
-   - Customer Service (KYC/KYB)
-   - Card Issuing Service
-   - Lending Service
-   - Compliance Service
-
-2. **Advanced Features**
-   - Multi-factor authentication
-   - Real-time fraud detection with ML
-   - Advanced reporting and analytics
-   - Mobile banking app (iOS/Android)
-   - Open Banking / PSD2 API compliance
-
-3. **DevOps & Infrastructure**
-   - Kubernetes deployment
-   - Service mesh (Istio)
-   - Distributed tracing (Jaeger)
-   - Metrics collection (Prometheus/Grafana)
-
-## Documentation
-
-- [System Requirements](./docs/REQUIREMENTS.md)
-- [Development Guide](./docs/DEVELOPMENT.md)
-- [API Documentation](./docs/API.md)
-- [Database Schema](./docs/DATABASE.md)
-
-## Contributing
-
-This is a mockup/prototype system for learning and demonstration purposes. Feel free to fork, modify, and extend.
-
-## License
-
-MIT License - See LICENSE file for details
-
-## Contact & Support
-
-For questions or issues, please create an issue on GitHub or contact the development team.
-
----
-
-**Note:** This is a demonstration/mockup system showcasing Core Banking System architecture using modern Java and microservices patterns. For production use, additional security, compliance, and reliability measures must be implemented.
+Predstav si, ze si product owner Core Banking Systemu (CBS). Chces vytvorit novy CBS pre banku, ktora sa venuje retailu, ale aj korporatnemu bankovnictvu. Potrebujem vypisat a popisat hlavne funkcionality tohto CBS z dovodu vytvorenia zadania pre dodavatela takehoto systemu. 
+
+Ber do uvahy hlavne core sluzby, ale tiez aj dalsie, ktore bude potrebne vytvorit. Jedna sa o banku, ktora je silna v acquiringu ale aj issuingu.
+Tu je komplexný prehľad hlavných funkcionalít pre zadanie dodávateľa CBS. Začnem architektonickým diagramom a potom rozoberiem každú oblasť podrobnejšie.
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.25s;
+    animation-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+  }
+VvisualizeVvisualize show_widget
+1. Správa účtov (Account Management)
+Jadro celého CBS. Systém musí podporovať kompletný životný cyklus bankových produktov — od otvorenia až po zrušenie.
+Retailové účty: bežné účty (current accounts), sporiace účty, termínované vklady, detské a študentské účty, spoločné účty. Každý typ má vlastnú štruktúru úročenia, poplatkovú schému a pravidlá disponibility.
+Korporátne účty: firemné bežné účty, multi-currency účty, nostro/vostro účty, účty pre správu likvidity (notional a physical pooling), escrow účty.
+Kľúčové požiadavky: multi-currency, multi-entity architektonická podpora, real-time aktualizácia zostatkov, parametrizovateľné typy produktov bez nutnosti programovania, podpora ISO 20022 dátového modelu.
+
+2. Platobný engine (Payments Processing)
+Jedna z najkritickejších komponentov vzhľadom na silnú acquiring pozíciu banky.
+Lokálne a SEPA platby: SEPA Credit Transfer (SCT), SEPA Direct Debit (SDD Core a B2B), SEPA Instant Credit Transfer (SCT Inst) s SLA do 10 sekúnd, BACS/TARGET2.
+Medzinárodné platby: SWIFT MT a MX (ISO 20022), korešpondenčné bankovníctvo, FX konverzné jadro s real-time kurzmi, tracking a notifikácie stavu platby.
+Interné platby: real-time medziúčtové prevody, hromadné platby (bulk processing), stojace príkazy, inkasá. Engine musí zvládnuť vysokú transakčnú záťaž — minimálne 1 000 TPS s latenciou pod 200 ms pre instant platby.
+
+3. Issuing — Vydávanie platobných kariet
+Táto oblasť je pre banku strategická a musí byť plnohodnotne riešená natívne v CBS alebo prostredníctvom tesne integrovaného card management systému (CMS).
+Typy kariet: debetné karty (Visa/Mastercard/domestic scheme), kreditné karty s revolvingovým aj charge modelom, predplatené karty (single-use aj multi-use), virtuálne karty (primárne pre B2B a eCommerce), korporátne karty s nastaviteľnými limitmi pre jednotlivých zamestnancov.
+Card lifecycle management: žiadosť a schválenie, personalizácia a výroba (integrácia s card bureau), aktivácia, blokácia/odblokácia, PIN manažment (online PIN change, PIN reveal), obnova a reissue, zrušenie.
+Autorizácia a clearing: real-time autorizačný engine (integrácia na Visa/MC processing sieť), parametrizovateľné autorizačné pravidlá (limity, geografické obmedzenia, merchant category kódy), 3DS 2.x server pre eCommerce transakcie.
+Tokenizácia: podpora Apple Pay, Google Pay, Samsung Pay, HCE — integrácia na Token Service Provider (TSP) Visa/Mastercard.
+Rewards a lojalita: bodový systém, cashback schémy, kampane — buď natívne, alebo cez integrovanú platformu tretej strany.
+
+4. Acquiring — Akceptácia platobných kariet
+Druhý strategický pilier banky. CBS musí pokrývať celý acquiring cyklus.
+Merchant management: onboarding obchodníkov vrátane KYB (Know Your Business), správa zmlúv a MDR (Merchant Discount Rate), hierarchická štruktúra obchodníkov (chain, outlet), správa terminálov (TMS integrácia).
+Transakčné spracovanie: autorizácia cez sieť Visa/Mastercard (integrácia na scheme processing), clearing a settlement (T+1/T+0), chargeback a dispute management workflow, refund a reversal handling.
+POS infraštruktúra: integrácia na TMS pre vzdialenú správu terminálov, podpora kontaktných, bezkontaktných a QR platieb.
+eCommerce acquiring: payment gateway, 3DS 2.x issuer a acquirer server, podpora alternatívnych platobných metód (BNPL, digital wallets), podvod detekcia špecifická pre CNP transakcie.
+Reporting pre obchodníkov: portál pre obchodníkov s real-time prehľadom transakcií, settlement reporty, reklamačný modul.
+
+5. Úverový modul (Lending)
+Retail lending: spotrebné úvery, hypotekárne úvery, kontokorenty, kreditné karty s úverovým rámcom. Systém musí pokrývať celý proces — žiadosť, scoring (integrácia na externé credit bureau: CRIF, SCHUFA), schválenie, čerpanie, splácanie, refinancovanie, delikvenciu a vymáhanie.
+Corporate lending: korporátne úvery (bilaterálne aj syndikované), revolvingové kreditné linky, projektové financovanie, leasing, prevádzkové financovanie. Nevyhnutná podpora covenantov, waiverov a amendmentov k zmluvám.
+Spoločné požiadavky: parametrizovateľné úrokové schémy (fixná, variabilná, cap/floor, EURIBOR referencing), automatizovaný výpočet RPMN, podpora IFRS 9 impairmentového modelu, integrácia na register záložných práv.
+
+6. Trade Finance a Cash Management (Corporate)
+Cash Management: multi-level account pooling (notional a physical), intraday liquidity reporting, cash flow forecasting, ZBA (Zero Balance Account) štruktúry, virtual account management pre korporátnych klientov.
+Trade Finance: dokumentárne akreditívy (L/C — import aj export), bankové záruky a záväzkové listy, dokumentárne inkasá, supply chain financing, factoring a forfeiting, integrácia na SWIFT Trade Services Utility (TSU) a platformy ako Komgo.
+
+7. Risk, Fraud a Compliance
+AML / CFT: real-time transakčný monitoring, zákazníkový rizikový profil (Customer Risk Rating), PEP a sankčné screeningy (integrácia na World-Check, Dow Jones), SAR workflow (Suspicious Activity Report), podpora regulačného reportingu NBS/ECB.
+Fraud management: real-time fraud scoring engine (ML modely), rule-based aj AI-based detekcia, case management pre fraud analytikov, integrácia na Visa/Mastercard fraud siete (Visa Advanced Authorisation, MC Expert Monitoring).
+Compliance a regulatory reporting: GDPR compliance (dátové mapy, žiadosti o výmaz/prenos), Basel III/IV kapitálová primeranosť, DORA (digitálna odolnosť), PSD2/PSR compliance, automatizovaný reporting NBS, ECB (FINREP/COREP), FATCA/CRS.
+
+8. Hlavná kniha a Účtovníctvo (General Ledger)
+Plnohodnotný accounting engine integrovaný priamo do CBS — nie externý ERP.
+Požiadavky: multi-entity, multi-currency, multi-GAAP (IFRS aj lokálne štandardy), automatizované zaúčtovanie pre každý typ transakcie, denné a mesačné uzávierky, intercompany zaúčtovanie, integrácia na externý ERP (SAP, Oracle) cez API, plná auditovateľnosť každého záznamu.
+
+9. Onboarding a KYC/KYB
+Retail KYC: digitálny onboarding (web + mobilná aplikácia), eID a video KYC podpora, automatizovaná verifikácia dokladov (OCR + AI), biometrická verifikácia, real-time overenie voči registrom (živnostenský, obchodný, sankčné zoznamy).
+Corporate KYB: UBO (Ultimate Beneficial Owner) identifikácia a verifikácia, overenie z obchodných registrov (automatizovaná integrácia), due diligence workflow, pravidelná revízia KYC profilov (Periodic Review), risk-based approach.
+
+10. Kanály a Digital Banking
+CBS musí expozovať plnú funkcionalitu cez:
+Internet Banking (Web): plnohodnotná správa účtov, platby, kreditné produkty, dokumenty, notifikácie.
+Mobile Banking: iOS a Android natívne aplikácie, podpora biometrickej autentifikácie, push notifikácie, in-app customer support.
+Open Banking / API: PSD2-compliant API (Account Information Service, Payment Initiation Service), developer portal, sandbox prostredie, OAuth 2.0 a FAPI bezpečnostný profil.
+ATM/Cash: ATM driving integrácia (XFS štandard), podpora bezkontaktného výberu (tap & withdraw), cardless výber cez QR/OTP.
+
+11. CRM, Product Catalogue a Pricing Engine
+CRM — Customer 360: jednotný pohľad na zákazníka cez všetky produkty, segmentácia, lifecycle management, integrácia na marketingové nástroje.
+Product Catalogue: centralizovaná správa bankových produktov a ich parametrov — bez nutnosti programovania pri zavádzaní nových produktov. Parametrizácia úrokových sadzieb, poplatkov, limitov, podmienok.
+Pricing Engine: individuálne ceny pre korporátnych klientov (relationship-based pricing), dynamické ceny pre retailové produkty, kampane a špeciálne ponuky.
+
+12. Integračná a Technologická architektura
+Toto je pre dodávateľa jedno z kľúčových hodnotiacich kritérií:
+API-first architektúra: každá funkcionalita musí byť dostupná ako REST alebo GraphQL API, podpora asynchrónnej komunikácie (Kafka, RabbitMQ).
+Core integrácie: VISA/Mastercard scheme siete, SWIFT (FileAct, InterAct, Browse), NBS SIPS (Slovenský interbankový platobný systém), TARGET2/TARGET2-Securities, credit bureau (CRIF), daňový úrad, obchodný register.
+Nefunkčné požiadavky: 99,99 % dostupnosť (max 52 min downtime/rok), horizontálna škálovateľnosť, cloud-native alebo cloud-ready architektúra, podpora aktívno-aktívneho datacentra, RTO < 4 hod / RPO < 1 hod.
+
+Súhrn modulov pre zadanie dodávateľa
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.25s;
+    animation-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+  }
+VvisualizeVvisualize show_widget
+Toto je základ zadania pre dodávateľa CBS. Pre finálny RFP (Request for Proposal) dokument by bolo vhodné doplniť ešte tieto sekcie:
+Čo doplniť do zadania: detailné SLA a nefunkčné požiadavky (TPS, latencia, dostupnosť), požiadavky na migrčnú stratégiu (prechod zo starého systému), licenčný model (perpetual vs SaaS/cloud), požiadavky na lokalizáciu (slovenské a európske regulačné špecifiká), referenčné inštalácie v obdobných bankách, model podpory a SLA pre produkčné prostredie.
+Chceš, aby som niektorú z oblastí rozpracoval podrobnejšie — napríklad do formy detailných user stories, alebo aby som pripravil celý dokument ako formálne zadanie pre dodávateľa (RFP)?Pridaj este pozadovany popis na integracnu vstvu, nakolko banka uvazuje o integracii s partnermi, ktori budu dodavat banke nove sluzby, ktore sama banka neposkytuje. Vytvor zadanie s popisom integracnych vrstiev a poziadaviek.10:33 AMArchitektúrou integračnú vrstvu s API Gateway a partnerským rámcomArchitektúrou integračnú vrstvu s API Gateway a partnerským rámcomVytvorím formálne zadanie ako Word dokument. Najprv pripravím diagram architektúry integračnej vrstvy a potom kompletný .docx dokument.
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.25s;
+    animation-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+  }
+VvisualizeVvisualize show_widgetTeraz vytvorím kompletný Word dokument so zadaním.Ran 5 commands, edited 2 files, created a fileRan 5 commands, edited 2 files, created a fileDokument je hotový. Tu je prehľad toho, čo zadanie pokrýva v 10 kapitolách:
+Štruktúra dokumentu:
+
+Úvod — kontext BaaP stratégie, dôvod samostatnej integračnej vrstvy
+Architektonický rámec — 4-vrstvový model (API GW → ESB → Event Streaming → External Connectors), princípy návrhu (API-first, Event-Driven, loose coupling)
+API Gateway a Developer Portal — OAuth2/FAPI požiadavky, rate limiting, audit log, samoobslužný onboarding partnerov, sandbox prostredie
+ESB / Integration Middleware — routing, protocol transformation, orchestrácia, Saga pattern, Outbox pattern — kompletný katalóg 8 EIP vzorov s prioritou
+Event Streaming Platform — Kafka požiadavky, katalóg 30+ domain eventov (účty, platby, karty, KYC, AML...), CDC požiadavky
+External Connector Hub — tabuľka všetkých regulačných a schemata integrácií (Visa/MC, SWIFT, NBS, Target2, CRIF, ORSR...)
+Partner Ecosystem / BaaP — 6-fázový onboarding framework, 3-tier klasifikácia partnerov, kompletný katalóg plánovaných integrácií (finančné, technologické, prevádzkové)
+Bezpečnosť — TLS/mTLS, tokenizácia PAN, IAM, SIEM, penetračné testovanie, PCI DSS v4.x požiadavky
+Nefunkčné požiadavky a SLA — dostupnosť, RTO/RPO, throughput, latencia, zoznam protokolov a štandardov
+Governance — lifecycle management, API versioning/deprecation policy, GDPR/DORA compliance[CBS_Integracna_Vrstva_Zadanie.docx](https://github.com/user-attachments/files/26372941/CBS_Integracna_Vrstva_Zadanie.docx)
